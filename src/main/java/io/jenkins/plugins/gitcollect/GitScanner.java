@@ -16,12 +16,16 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @SuppressFBWarnings(value = "SE", justification = "GitClient implementation is Serializable")
 public class GitScanner extends MasterToSlaveFileCallable<LocalGitInfo> {
     private static final long serialVersionUID = 1L;
     private final GitClient git;
     private final String targetStr;
+
+    public static final Logger LOGGER = Logger.getLogger(GitScanner.class.getName());
 
     public GitScanner(GitClient git, String targetStr) {
         this.git = git;
@@ -43,6 +47,8 @@ public class GitScanner extends MasterToSlaveFileCallable<LocalGitInfo> {
         } catch (GitException e) {
             throw new IOException("[GitCollect] Could not resolve revision '" + targetHead + "'", e);
         }
+
+        LOGGER.log(Level.FINE, "TargetHead: " + targetHead);
 
         try {
             Revision builtRevision = new Revision(resolvedObjectId);

@@ -2,6 +2,8 @@ package io.jenkins.plugins.gitcollect;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 
@@ -32,6 +34,8 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
 
     private String path;
     private String markedCommit; // Optional: A branch name (e.g. "master") or SHA
+
+    public static final Logger LOGGER = Logger.getLogger(CollectGitStep.class.getName());
 
     /**
      * Checks if the given directory is a valid Git repository.
@@ -90,12 +94,10 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
                            ? markedCommit
                            : "HEAD";
 
-        listener.getLogger().println("[GitCollect] Analyzing repository at: " + gitDir.getRemote());
+        LOGGER.log(Level.INFO, "Analyzing repository at: " + gitDir.getRemote());
         LocalGitInfo info = workspace.act(new GitScanner(git, markedCommit));
 
-        listener.getLogger().println("[GitCollect] url: " + info.getRemoteUrl() + " branch: " + info.getBranch());
-
-        listener.getLogger().println("[GitCollect] Analyzing repository at: " + gitDir.getRemote());
+        LOGGER.log(Level.FINE, "url: " + info.getRemoteUrl() + " branch: " + info.getBranch());
 
         Result result = run.getResult();
         if (result == null) {
@@ -129,7 +131,7 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
             run.addAction(new MultiScmEnvAction(info));
         }
 
-        listener.getLogger().println("[GitCollect] BuildData attached. Marked: " + targetStr + ", Built: " + info.getShaRevision());
+        LOGGER.log(Level.FINE, "BuildData attached. Marked: " + targetStr + ", Built: " + info.getShaRevision());
     }
 
     @Symbol("collectGit") // Allows: collectGit path: 'src', markedCommit: 'master'
