@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,6 +39,8 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.plugins.git.GitException;
 import hudson.plugins.git.GitSCM;
+import hudson.plugins.git.extensions.GitSCMExtension;
+import hudson.plugins.git.extensions.impl.RelativeTargetDirectory;
 import hudson.plugins.git.util.Build;
 import hudson.plugins.git.util.BuildData;
 import hudson.tasks.BuildStepDescriptor;
@@ -103,10 +106,14 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
     /**
      * Performs the necessary logic against Pipeline jobs.
      */
-    private void perfromAgainstWorkflowRun(WorkflowRun run, FilePath workspace,
+    private void perfromAgainstWorkflowRun(WorkflowRun run, FilePath gitDir, FilePath workspace,
                 TaskListener listener, String url, String changeLogPath) throws IOException, Exception {
         SCMListenerImpl scmListenerImpl = new WorkflowRun.SCMListenerImpl();
-        scmListenerImpl.onCheckout(run, new GitSCM(url), workspace, listener,
+
+        GitSCM scm = new GitSCM(url);
+        scm.getExtensions().add(new RelativeTargetDirectory(gitDir.getRemote()));
+
+        scmListenerImpl.onCheckout(run, scm, workspace, listener,
                                    new File(changeLogPath), null);
     }
 
@@ -180,7 +187,7 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
             String path = writeChangelog(run, git, info);
             if (path != null && !path.isEmpty() && run instanceof WorkflowRun) {
                 try {
-                    perfromAgainstWorkflowRun((WorkflowRun)run, workspace, listener,
+                    perfromAgainstWorkflowRun((WorkflowRun)run, gitDir, workspace, listener,
                                               info.getRemoteUrl(), path);
                 } catch (Exception e) {
                     e.printStackTrace();
