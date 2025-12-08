@@ -52,6 +52,11 @@ pipeline {
                 collectGit path: 'src', markedCommit: '64ed978d54d2db4522a326c3f5cba6f8d4b41f8f'
             }
         }
-
+        stage('Register Git Data from a marked commit, including changelog') {
+            steps {
+                // Looks for .git in the 'src' folder, and reference commit 'markedCommit'
+                collectGit path: 'src', markedCommit: '64ed978d54d2db4522a326c3f5cba6f8d4b41f8f', changelog: true
+            }
+        }
     }
 }
