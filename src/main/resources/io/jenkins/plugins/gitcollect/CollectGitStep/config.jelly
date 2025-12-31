@@ -3,10 +3,10 @@
     <f:entry title="Repository Path" field="path" description="Relative path to the folder containing .git">
         <f:textbox />
     </f:entry>
-    <f:entry title="Marked Commit / Branch" field="markedCommit" description="Branch name (e.g. 'master') or SHA1. Defaults to HEAD.">
+    <f:entry title="Marked Commit / Branch" default="HEAD" field="markedCommit" description="Branch name (e.g. 'master') or SHA1. Defaults to HEAD.">
         <f:textbox />
     </f:entry>
-    <f:entry title="Git remote name" field="remote" description="Optional remote name, if is not defined we consider it as origin">
+    <f:entry title="Git remote name" default="origin" field="remote" description="Optional remote name, if is not defined we consider it as origin">
         <f:textbox />
     </f:entry>
     <f:entry field="changelog">
