@@ -129,7 +129,7 @@ public class GitScanner extends MasterToSlaveFileCallable<LocalGitInfo> {
 
             URIish uri = new URIish(url);
 
-            return new LocalGitInfo(uri.getHumanishName(), url, builtRevision, markedRevision);
+            return new LocalGitInfo(uri.getHumanishName(), url, remote, builtRevision, markedRevision);
         } catch (URISyntaxException e) {
             throw new IOException("[GitCollect] Unable to find an uri name", e);
         }

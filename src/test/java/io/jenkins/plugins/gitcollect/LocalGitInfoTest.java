@@ -24,7 +24,7 @@ public class LocalGitInfoTest {
 
         Revision marked = new Revision(id);
 
-        LocalGitInfo info = new LocalGitInfo("scm", "ssh://example/repo.git", built, marked);
+        LocalGitInfo info = new LocalGitInfo("scm", "ssh://example/repo.git", "origin", built, marked);
 
         assertEquals("main", info.getBranch());
         assertEquals(id.getName(), info.getShaRevision());

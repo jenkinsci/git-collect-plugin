@@ -24,7 +24,7 @@ public class MultiScmEnvActionTest {
 
         Revision marked = new Revision(id);
 
-        LocalGitInfo info = new LocalGitInfo("my/SCM-name", "ssh://git@example.com:29418/repo.git", built, marked);
+        LocalGitInfo info = new LocalGitInfo("my/SCM-name", "ssh://git@example.com:29418/repo.git", "origin", built, marked);
 
         MultiScmEnvAction action = new MultiScmEnvAction(info);
 
