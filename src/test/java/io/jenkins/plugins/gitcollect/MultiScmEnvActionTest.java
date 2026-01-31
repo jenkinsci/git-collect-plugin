@@ -2,7 +2,7 @@ package io.jenkins.plugins.gitcollect;
 
 import hudson.EnvVars;
 import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import hudson.plugins.git.Branch;
 import hudson.plugins.git.Revision;
@@ -10,12 +10,12 @@ import hudson.plugins.git.Revision;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class MultiScmEnvActionTest {
 
     @Test
-    public void testBuildEnvironmentAddsVars() {
+    void testBuildEnvironmentAddsVars() {
         ObjectId id = ObjectId.fromString("2222222222222222222222222222222222222222");
         Revision built = new Revision(id);
         Collection<Branch> branches = new ArrayList<>();

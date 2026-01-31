@@ -2,24 +2,18 @@ package io.jenkins.plugins.gitcollect;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.jenkinsci.plugins.gitclient.GitClient;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-
-import hudson.plugins.git.Branch;
-import hudson.plugins.git.Revision;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
 
-
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GitScannerTest {
 
     @Test
-    public void testInvokeResolvesRevisionsAndUrl() throws IOException, InterruptedException, Exception {
+    void testInvokeResolvesRevisionsAndUrl() throws IOException, InterruptedException, Exception {
         GitClient git = Mockito.mock(GitClient.class);
 
         ObjectId resolved = ObjectId.fromString("3333333333333333333333333333333333333333");

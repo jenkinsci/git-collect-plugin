@@ -1,7 +1,7 @@
 package io.jenkins.plugins.gitcollect;
 
 import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import hudson.plugins.git.Branch;
 import hudson.plugins.git.Revision;
@@ -9,12 +9,12 @@ import hudson.plugins.git.Revision;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class LocalGitInfoTest {
 
     @Test
-    public void testGetBranchAndShaRevision() {
+    void testGetBranchAndShaRevision() {
         ObjectId id = ObjectId.fromString("1111111111111111111111111111111111111111");
         Revision built = new Revision(id);
 
