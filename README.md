@@ -7,9 +7,11 @@
 [![Jenkins Plugin](https://img.shields.io/badge/jenkins-plugin-blue.svg)](https://jenkins.io)
 [![Build Status](https://img.shields.io/badge/build-ready-brightgreen.svg)]()
 
-**Git Collect** is a Jenkins plugin that allows you to register an **already existing** local Git repository into the Jenkins build data without performing a network `fetch`, `clone`, or `checkout`.
+**Git Collect** is a Jenkins plugin that allows you to register an **already existing** local Git repository into the Jenkins build
+data without performing a network `fetch`, `clone`, or `checkout`.
 
-This is ideal for complex pipelines where the source code is retrieved by external scripts, pre-mounted volumes, or other tools, but you still want Jenkins to record the Git revision, branch information, and trigger downstream plugins (like the Git Parameter or Release plugins).
+This is ideal for complex pipelines where the source code is retrieved by external scripts, pre-mounted volumes, or other tools, but you still
+want Jenkins to record the Git revision, branch information, and be compatible as plugin like git-forensic.
 
 ---
 
