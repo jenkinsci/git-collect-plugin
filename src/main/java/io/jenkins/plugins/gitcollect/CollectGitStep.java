@@ -341,7 +341,7 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
                            ? markedCommit
                            : "HEAD";
 
-        LOGGER.log(Level.INFO, "Analyzing repository at: " + gitDir.getRemote());
+        LOGGER.log(Level.FINE, "Analyzing repository at: " + gitDir.getRemote());
         LocalGitInfo info = workspace.act(new GitScanner(git, markedCommit, getRemote()));
 
         LOGGER.log(Level.FINE, "url: " + info.getRemoteUrl() + " branch: " + info.getBranch());
@@ -373,7 +373,7 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
         }
 
         if (buildData.lastBuild != null) {
-            LOGGER.log(Level.INFO, "Last Built Revision: " + buildData.lastBuild.revision);
+            LOGGER.log(Level.FINE, "Last Built Revision: " + buildData.lastBuild.revision);
         }
 
         buildData.addRemoteUrl(info.getRemoteUrl());
