@@ -34,9 +34,11 @@ public class MultiScmEnvActionTest {
         assertEquals(id.getName(), env.get("GIT_COMMIT"));
         assertEquals("feature/x", env.get("GIT_BRANCH"));
         assertEquals("ssh://git@example.com:29418/repo.git", env.get("GIT_URL"));
+        assertEquals("origin", env.get("GIT_REMOTE"));
 
         String safeName = "my_SCM_name"; // my/SCM-name -> my_SCM_name
         assertEquals(id.getName(), env.get("GIT_COMMIT_" + safeName));
         assertEquals("feature/x", env.get("GIT_BRANCH_" + safeName));
+        assertEquals("origin", env.get("GIT_REMOTE_" + safeName));
     }
 }
