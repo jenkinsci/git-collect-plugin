@@ -21,7 +21,6 @@ import org.jenkinsci.plugins.gitclient.ChangelogCommand;
 import org.jenkinsci.plugins.gitclient.Git;
 import org.jenkinsci.plugins.gitclient.GitClient;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
-import org.jenkinsci.plugins.workflow.job.WorkflowRun.SCMListenerImpl;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
@@ -35,6 +34,7 @@ import hudson.model.AbstractProject;
 import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.TaskListener;
+import hudson.model.listeners.SCMListener;
 import hudson.plugins.git.GitException;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.browser.GitLab;
@@ -176,24 +176,25 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
      * Manually triggers the SCM checkout listeners for Workflow (Pipeline) runs.
      *
      * <p>This method constructs a temporary {@link GitSCM} instance and invokes the
-     * {@link SCMListenerImpl#onCheckout} method to ensure that the changelog
+     * {@link SCMListener#onCheckout} method to ensure that the changelog
      * is properly registered and visible in the Pipeline UI.
      *
-     * @param run           The current workflow run.
-     * @param gitDir        The FilePath to the git repository.
-     * @param workspace     The workspace root.
-     * @param listener      The task listener.
-     * @param url           The remote URL of the git repository.
-     * @param changeLogPath The path to the generated changelog XML file.
+     * @param run             The current workflow run.
+     * @param targetDirectory The directory relative to the workspace that contains the Git repository,
+     *                        or {@code null}/{@code ""} if the repository is at the workspace root.
+     * @param workspace       The workspace root.
+     * @param listener        The task listener.
+     * @param url             The remote URL of the git repository.
+     * @param changeLogPath   The path to the generated changelog XML file.
      * @throws IOException If an I/O error occurs.
      * @throws Exception   If any other error occurs during the listener invocation.
      */
-    private GitSCM perfromAgainstWorkflowRun(WorkflowRun run, FilePath gitDir, FilePath workspace,
+    private GitSCM perfromAgainstWorkflowRun(WorkflowRun run, String targetDirectory, FilePath workspace,
                 TaskListener listener, String url, String changeLogPath) throws IOException, Exception {
-        SCMListenerImpl scmListenerImpl = new WorkflowRun.SCMListenerImpl();
-
         GitSCM scm = new GitSCM(url);
-        scm.getExtensions().add(new RelativeTargetDirectory(gitDir.getRemote()));
+        if (targetDirectory != null && !targetDirectory.trim().isEmpty()) {
+            scm.getExtensions().add(new RelativeTargetDirectory(targetDirectory));
+        }
         GitRepositoryBrowser browser = (GitRepositoryBrowser) scm.guessBrowser();
 
         if (browser == null) {
@@ -206,8 +207,15 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
 
         scm.setBrowser(browser);
 
-        scmListenerImpl.onCheckout(run, scm, workspace, listener,
-                                   new File(changeLogPath), null);
+        File changelogFile = new File(changeLogPath);
+        for (SCMListener scmListener : SCMListener.all()) {
+            try {
+                scmListener.onCheckout(run, scm, workspace, listener, changelogFile, null);
+            }
+            catch (Exception exception) {
+                LOGGER.log(Level.WARNING, "Failed to notify SCM listener '" + scmListener + "' of checkout", exception);
+            }
+        }
         return scm;
     }
 
@@ -346,6 +354,12 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
 
         LOGGER.log(Level.FINE, "url: " + info.getRemoteUrl() + " branch: " + info.getBranch());
 
+        // Register the collected revision as GIT_COMMIT before notifying the SCM listeners. The
+        // git-forensics GitCheckoutListener resolves the repository HEAD from GIT_COMMIT (falling
+        // back to "HEAD"), so without this it would pick up a stale GIT_COMMIT left over from an
+        // earlier checkout (e.g. a shared library) that does not exist in this repository.
+        run.addAction(new MultiScmEnvAction(info));
+
         Result result = run.getResult();
         if (result == null) {
             result = Result.SUCCESS;
@@ -358,7 +372,7 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
             String path = writeChangelog(run, git, info);
             if (path != null && !path.isEmpty() && run instanceof WorkflowRun) {
                 try {
-                    scm = perfromAgainstWorkflowRun((WorkflowRun)run, gitDir, workspace, listener,
+                    scm = perfromAgainstWorkflowRun((WorkflowRun)run, this.path, workspace, listener,
                                               info.getRemoteUrl(), path);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -399,7 +413,6 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
         // finishes.
         if (!buildDataAlreadyPresent) {
             run.addAction(buildData);
-            run.addAction(new MultiScmEnvAction(info));
         }
 
         LOGGER.log(Level.FINE, "BuildData attached. Marked: " + targetStr + ", Built: " + info.getShaRevision());
