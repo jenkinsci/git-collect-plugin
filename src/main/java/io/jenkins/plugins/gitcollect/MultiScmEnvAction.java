@@ -16,12 +16,14 @@ public class MultiScmEnvAction implements EnvironmentContributingAction {
         env.put("GIT_COMMIT", info.getShaRevision());
         env.put("GIT_BRANCH", info.getBranch());
         env.put("GIT_URL", info.getRemoteUrl());
+        env.put("GIT_REMOTE", info.getRemote());
 
         String safeName = info.getScmName().replaceAll("[^a-zA-Z0-9_]", "_");
 
         env.put("GIT_COMMIT_" + safeName, info.getShaRevision());
         env.put("GIT_BRANCH_" + safeName, info.getBranch());
         env.put("GIT_URL_" + safeName, info.getRemoteUrl());
+        env.put("GIT_REMOTE_" + safeName, info.getRemote());
     }
 
     @Override
