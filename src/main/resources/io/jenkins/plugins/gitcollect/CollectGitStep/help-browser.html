@@ -1,0 +1,18 @@
+<div>
+    <p>
+        The browser the changelog links are built with, the same ones the Git SCM offers. Each one
+        asks for the URL of the repository on its web frontend, without the commit part that
+        Jenkins adds itself.
+    </p>
+    <p>
+        <b>(Auto)</b> guesses it from the remote: a <code>github.com</code>, <code>gitlab.com</code>
+        or <code>bitbucket.org</code> remote gets its own frontend, a remote shaped like a Gerrit
+        (its host name, an <code>/a/</code> clone path, a <code>plugins/gitiles</code> path, or the
+        SSH port 29418) is linked with the gitiles URLs, and anything else with the GitHub ones.
+    </p>
+    <p>
+        A browser set here wins over <b>Browser URL</b>, which in turn wins over the guess. Use
+        <b>Browser URL</b> for the two Gerrit forms, and a browser here for the frontends whose
+        links cannot be derived from a URL alone.
+    </p>
+</div>

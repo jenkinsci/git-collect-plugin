@@ -64,13 +64,18 @@ pipeline {
 }
 ```
 
-#### Changelog links and `browserUrl`
+#### Changelog links and the repository browser
 
 With `changelog: true`, every commit of the changelog links to its page on the web frontend of the
 repository, and every changed file links to its diff. The plugin works the address out from the remote
 URL and appends the commit part itself, so this is only needed for the repositories it cannot recognise.
 
-`browserUrl` is that address: the base URL of the repository browser, without the `+/<sha1>` part.
+There are two ways to say which browser to use, one terse and one complete:
+
+* `browserUrl` is the base URL of the repository browser, without the `+/<sha1>` part. The link format
+  still follows the URL, so it reaches the frontends whose links can be told apart by their address.
+* `browser` is a whole repository browser, the same ones the Git SCM offers, and says both the address
+  and the link format. It is what the **Repository Browser** drop down sets in the job configuration.
 
 GerritHub does not run the gitiles plugin, so its commit pages are not below `/plugins/gitiles/<project>`
 but below `/c/<project>`, and the address guessed from the remote would answer 404:
@@ -100,7 +105,17 @@ collectGit path: 'src', changelog: true,
            browserUrl: 'https://gerrit.example.com/plugins/gitiles/amarula/checks-jenkins'
 ```
 
-The same value can be set as **Browser URL** in the job configuration.
+Any other browser can be named outright, for a frontend the plugin would not have recognised or for one
+whose links it would have built the wrong way:
+
+```groovy
+collectGit path: 'src', changelog: true,
+           browser: [$class: 'Gitiles', repoUrl: 'https://gerrit.example.com/plugins/gitiles/amarula/checks-jenkins']
+
+// or any other browser the Git SCM plugin offers, e.g.:
+collectGit path: 'src', changelog: true,
+           browser: [$class: 'GitLab', repoUrl: 'https://gitlab.example.com/amarula/checks-jenkins/']
+```
 
 Left unset, the address is guessed from the remote URL:
 
@@ -111,7 +126,10 @@ Left unset, the address is guessed from the remote URL:
 * anything else is linked with the GitHub URL format, as in `.../commit/<sha1>`.
 
 That guess cannot know about a Gerrit served from a name that says nothing about it and cloned over an
-anonymous https URL, nor about a self-hosted frontend, which is what `browserUrl` is for. It does not
-change the link format on its own: the plugin still reads the Gerrit markers off the URL to choose
-between the gitiles and the GitHub forms, so on a Gerrit with the gitiles plugin, spelling the browse
-path is what gets the gitiles links.
+anonymous https URL, nor about a self-hosted frontend: `browserUrl` and `browser` are what cover those.
+It reads a little too much as well, since Gerrit's `/a/` clone path is the same on the wire as a project
+that lives in an `a` directory, and such a remote is linked as a Gerrit until told otherwise.
+
+`browserUrl` sets the address but not the link format - the plugin still reads the Gerrit markers off
+the URL to choose between the gitiles and the GitHub forms - so where the format matters, name the
+browser instead.

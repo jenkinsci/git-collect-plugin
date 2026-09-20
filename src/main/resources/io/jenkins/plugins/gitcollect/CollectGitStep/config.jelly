@@ -12,6 +12,9 @@
     <f:entry title="Browser URL" field="browserUrl" description="Optional base URL for the changelog links, e.g. https://gerrithub.io/c/amarula/checks-jenkins. Leave empty to guess it from the remote.">
         <f:textbox />
     </f:entry>
+    <f:dropdownDescriptorSelector title="Repository Browser" field="browser" descriptors="${descriptor.browserDescriptors}">
+        <f:dropdownListBlock value="auto" title="(Auto)" selected="${instance.browser == null}"/>
+    </f:dropdownDescriptorSelector>
     <f:entry field="changelog">
         <f:checkbox title="Include in changelog?" default="true"/>
     </f:entry>

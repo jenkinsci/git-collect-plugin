@@ -13,6 +13,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.gitclient.ChangelogCommand;
@@ -29,6 +30,7 @@ import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.AbstractProject;
+import hudson.model.Descriptor;
 import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.TaskListener;
@@ -42,6 +44,7 @@ import hudson.plugins.git.browser.Gitiles;
 import hudson.plugins.git.extensions.impl.RelativeTargetDirectory;
 import hudson.plugins.git.util.Build;
 import hudson.plugins.git.util.BuildData;
+import hudson.scm.RepositoryBrowser;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
@@ -88,10 +91,19 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
      * Optional base URL of the repository browser, for instance
      * {@code https://gerrithub.io/c/amarula/checks-jenkins} on a Gerrit without the gitiles plugin,
      * or {@code https://git.example.com/plugins/gitiles/amarula/checks-jenkins} where it is
-     * installed. When unset, the browser is guessed from the remote URL, see
+     * installed. It is the short form of {@link #setBrowser(GitRepositoryBrowser)}: the link format
+     * still follows the URL, so it only reaches the browsers that can be told apart by their URL.
+     * When unset, the browser is guessed from the remote URL, see
      * {@link GitRemoteUrl#looksLikeGerrit(String)}.
      */
     private String browserUrl;
+
+    /**
+     * Optional repository browser for the changelog links, the same choice the Git SCM offers. It
+     * says both the address and the link format, so it reaches the browsers that
+     * {@link #setBrowserUrl(String)} cannot express.
+     */
+    private GitRepositoryBrowser browser;
 
     public static final Logger LOGGER = Logger.getLogger(CollectGitStep.class.getName());
 
@@ -132,6 +144,32 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
         }
         return String.format("%s%s/%s", remote.getWebRoot(), isGerrit ? "/plugins/gitiles" : "",
                              isGerrit ? remote.getGerritProject() : remote.getProject());
+    }
+
+    /**
+     * Picks the repository browser the changelog links are built with.
+     *
+     * <p>What was configured wins, in the order it says the most: a whole browser, then a browser
+     * URL, then the browser the Git SCM plugin can guess from the remote. When none of them says
+     * anything, the shape of the URL decides between the gitiles and the GitHub link format.
+     *
+     * @param configured    the browser configured on the step, or {@code null}.
+     * @param configuredUrl the browser URL configured on the step, or {@code null}.
+     * @param remoteUrl     the URL configured on the git remote.
+     * @param guessed       the browser guessed from the remote, or {@code null}.
+     * @return the browser to build the changelog links with.
+     */
+    static GitRepositoryBrowser selectBrowser(GitRepositoryBrowser configured, String configuredUrl,
+                                              String remoteUrl, GitRepositoryBrowser guessed) {
+        if (configured != null) {
+            return configured;
+        }
+        if (configuredUrl == null && guessed != null) {
+            return guessed;
+        }
+        boolean gerrit = GitRemoteUrl.looksLikeGerrit(remoteUrl) || GitRemoteUrl.looksLikeGerrit(configuredUrl);
+        String base = configuredUrl != null ? configuredUrl : convertToHttps(remoteUrl, gerrit);
+        return gerrit ? new Gitiles(base) : new GithubWeb(base);
     }
 
     /**
@@ -202,25 +240,16 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
             scm.getExtensions().add(new RelativeTargetDirectory(targetDirectory));
         }
         String configuredBrowserUrl = getBrowserUrl();
-        boolean gerrit = GitRemoteUrl.looksLikeGerrit(url) || GitRemoteUrl.looksLikeGerrit(configuredBrowserUrl);
-        GitRepositoryBrowser browser;
-
-        if (configuredBrowserUrl != null) {
-            // The user knows which web frontend serves this repository: use the URL as it is.
-            browser = gerrit ? new Gitiles(configuredBrowserUrl) : new GithubWeb(configuredBrowserUrl);
-        } else {
-            browser = (GitRepositoryBrowser) scm.guessBrowser();
-
-            if (browser == null) {
-                String remoteBrowserUrl = convertToHttps(url, gerrit);
-                browser = gerrit ? new Gitiles(remoteBrowserUrl) : new GithubWeb(remoteBrowserUrl);
-            }
-        }
+        // The Git SCM plugin can guess a browser from the remote, but only where the step itself
+        // was not told which one to use.
+        GitRepositoryBrowser guessed = (browser == null && configuredBrowserUrl == null)
+                                       ? (GitRepositoryBrowser) scm.guessBrowser() : null;
+        GitRepositoryBrowser selected = selectBrowser(browser, configuredBrowserUrl, url, guessed);
 
         LOGGER.log(Level.FINE, "Changelog browser for " + url + ": "
-                   + browser.getClass().getSimpleName() + " at " + browser.getRepoUrl());
+                   + selected.getClass().getSimpleName() + " at " + selected.getRepoUrl());
 
-        scm.setBrowser(browser);
+        scm.setBrowser(selected);
 
         File changelogFile = new File(changeLogPath);
         for (SCMListener scmListener : SCMListener.all()) {
@@ -277,6 +306,25 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
      */
     public Boolean getChangelog() {
         return this.changelog;
+    }
+
+    /**
+     * Sets the repository browser used for the changelog links.
+     *
+     * @param browser The browser, as the Git SCM offers them.
+     */
+    @DataBoundSetter
+    public void setBrowser(GitRepositoryBrowser browser) {
+        this.browser = browser;
+    }
+
+    /**
+     * Gets the configured repository browser.
+     *
+     * @return The configured browser, or {@code null} when it has to be guessed.
+     */
+    public GitRepositoryBrowser getBrowser() {
+        return browser;
     }
 
     /**
@@ -468,6 +516,18 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
         @Override
         public String getDisplayName() {
             return "Git Collect: Register Local Data";
+        }
+
+        /**
+         * Lists the repository browsers that can build the links of a Git changelog, for the drop
+         * down of the job configuration: the same ones the Git SCM offers.
+         *
+         * @return the applicable {@link GitRepositoryBrowser} descriptors.
+         */
+        public List<Descriptor<RepositoryBrowser<?>>> getBrowserDescriptors() {
+            return RepositoryBrowser.all().stream()
+                    .filter(descriptor -> GitRepositoryBrowser.class.isAssignableFrom(descriptor.clazz))
+                    .collect(Collectors.toList());
         }
 
         @POST
