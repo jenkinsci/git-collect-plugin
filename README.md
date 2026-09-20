@@ -62,3 +62,56 @@ pipeline {
         }
     }
 }
+```
+
+#### Changelog links and `browserUrl`
+
+With `changelog: true`, every commit of the changelog links to its page on the web frontend of the
+repository, and every changed file links to its diff. The plugin works the address out from the remote
+URL and appends the commit part itself, so this is only needed for the repositories it cannot recognise.
+
+`browserUrl` is that address: the base URL of the repository browser, without the `+/<sha1>` part.
+
+GerritHub does not run the gitiles plugin, so its commit pages are not below `/plugins/gitiles/<project>`
+but below `/c/<project>`, and the address guessed from the remote would answer 404:
+
+```groovy
+stage('Register Git Data, linking to GerritHub') {
+    steps {
+        collectGit path: 'src',
+                   markedCommit: 'origin/master',
+                   changelog: true,
+                   // Commit links then read
+                   // https://gerrithub.io/c/amarula/checks-jenkins/+/<sha1>%5E%21
+                   browserUrl: 'https://gerrithub.io/c/amarula/checks-jenkins'
+    }
+}
+```
+
+The commit links and the `(diff)` links are then Gerrit routes, but the file-name links still use the
+gitiles `+blame/<sha1>/<path>` form, which only a gitiles frontend serves: on GerritHub those lead
+nowhere.
+
+A Gerrit that does run the gitiles plugin is browsed below its plugin path instead, and serves all
+three:
+
+```groovy
+collectGit path: 'src', changelog: true,
+           browserUrl: 'https://gerrit.example.com/plugins/gitiles/amarula/checks-jenkins'
+```
+
+The same value can be set as **Browser URL** in the job configuration.
+
+Left unset, the address is guessed from the remote URL:
+
+* a `github.com`, `gitlab.com` or `bitbucket.org` remote gets its own frontend;
+* a remote shaped like a Gerrit - its host name, an `/a/` clone path, a `plugins/gitiles` path, or the
+  SSH port 29418 - is linked with the gitiles URL format, as in
+  `https://gerrithub.io/plugins/gitiles/amarula/checks-jenkins/+/<sha1>%5E%21`;
+* anything else is linked with the GitHub URL format, as in `.../commit/<sha1>`.
+
+That guess cannot know about a Gerrit served from a name that says nothing about it and cloned over an
+anonymous https URL, nor about a self-hosted frontend, which is what `browserUrl` is for. It does not
+change the link format on its own: the plugin still reads the Gerrit markers off the URL to choose
+between the gitiles and the GitHub forms, so on a Gerrit with the gitiles plugin, spelling the browse
+path is what gets the gitiles links.

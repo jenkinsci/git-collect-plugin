@@ -13,8 +13,6 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.gitclient.ChangelogCommand;
@@ -63,9 +61,6 @@ import jenkins.tasks.SimpleBuildStep;
  */
 public class CollectGitStep extends Builder implements SimpleBuildStep {
 
-    private static final Pattern SSH_URI_PATTERN = Pattern.compile("^ssh://(?:[^@]+@)?([^:/]+)(?::\\d+)?/(.+)$");
-    private static final Pattern SCP_STYLE_PATTERN = Pattern.compile("^(?:[^@]+@)?([^:/]+):(.+)$");
-
     /**
      * The relative path to the Git repository within the workspace.
      * If null or empty, the workspace root is assumed.
@@ -89,6 +84,15 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
      */
     private Boolean changelog = false;
 
+    /**
+     * Optional base URL of the repository browser, for instance
+     * {@code https://gerrithub.io/c/amarula/checks-jenkins} on a Gerrit without the gitiles plugin,
+     * or {@code https://git.example.com/plugins/gitiles/amarula/checks-jenkins} where it is
+     * installed. When unset, the browser is guessed from the remote URL, see
+     * {@link GitRemoteUrl#looksLikeGerrit(String)}.
+     */
+    private String browserUrl;
+
     public static final Logger LOGGER = Logger.getLogger(CollectGitStep.class.getName());
 
     /**
@@ -106,26 +110,28 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
         }
     }
 
-    private static String convertToHttps(String sshUrl, boolean isGerrit) {
-        if (sshUrl == null || sshUrl.isEmpty()) {
-            return sshUrl;
+    /**
+     * Rewrites a Git remote URL into the base URL of the matching web repository browser.
+     *
+     * <p>SSH and scp-like remotes ({@code ssh://git@host:29418/project},
+     * {@code git@host:project}) are converted to their HTTPS equivalent, remotes that already use
+     * HTTP(S) keep their scheme, and a Gerrit web path in front of the {@code /a/} segment is
+     * kept. See {@link GitRemoteUrl} for what is dropped on the way, and
+     * {@link #setBrowserUrl(String)} for when the result is still not the right one.
+     *
+     * @param remoteUrl the URL configured on the git remote.
+     * @param isGerrit  whether the remote is served by Gerrit, see
+     *                  {@link GitRemoteUrl#looksLikeGerrit(String)}.
+     * @return the browser base URL, or the remote URL unchanged when it has no host to build one
+     *         from (local paths, {@code file://} remotes) or cannot be parsed.
+     */
+    static String convertToHttps(String remoteUrl, boolean isGerrit) {
+        GitRemoteUrl remote = GitRemoteUrl.parse(remoteUrl);
+        if (remote == null) {
+            return remoteUrl;
         }
-
-        // Check for URI style (ssh://...) first as it's more specific
-        Matcher uriMatcher = SSH_URI_PATTERN.matcher(sshUrl);
-        if (uriMatcher.find()) {
-            return String.format("https://%s%s/%s", uriMatcher.group(1), isGerrit == true ? "/plugins/gitiles" : "",
-                                 uriMatcher.group(2));
-        }
-
-        // Check for SCP style (git@...)
-        Matcher scpMatcher = SCP_STYLE_PATTERN.matcher(sshUrl);
-        if (scpMatcher.find()) {
-            return String.format("https://%s%s/%s", scpMatcher.group(1), isGerrit == true ? "/plugins/gitiles" : "",
-                                 scpMatcher.group(2));
-        }
-
-        return sshUrl;
+        return String.format("%s%s/%s", remote.getWebRoot(), isGerrit ? "/plugins/gitiles" : "",
+                             isGerrit ? remote.getGerritProject() : remote.getProject());
     }
 
     /**
@@ -195,15 +201,24 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
         if (targetDirectory != null && !targetDirectory.trim().isEmpty()) {
             scm.getExtensions().add(new RelativeTargetDirectory(targetDirectory));
         }
-        GitRepositoryBrowser browser = (GitRepositoryBrowser) scm.guessBrowser();
+        String configuredBrowserUrl = getBrowserUrl();
+        boolean gerrit = GitRemoteUrl.looksLikeGerrit(url) || GitRemoteUrl.looksLikeGerrit(configuredBrowserUrl);
+        GitRepositoryBrowser browser;
 
-        if (browser == null) {
-            if (url.contains("gerrit")) {
-                browser = new Gitiles(convertToHttps(url, true));
-            } else {
-                browser = new GithubWeb(convertToHttps(url, false));
+        if (configuredBrowserUrl != null) {
+            // The user knows which web frontend serves this repository: use the URL as it is.
+            browser = gerrit ? new Gitiles(configuredBrowserUrl) : new GithubWeb(configuredBrowserUrl);
+        } else {
+            browser = (GitRepositoryBrowser) scm.guessBrowser();
+
+            if (browser == null) {
+                String remoteBrowserUrl = convertToHttps(url, gerrit);
+                browser = gerrit ? new Gitiles(remoteBrowserUrl) : new GithubWeb(remoteBrowserUrl);
             }
         }
+
+        LOGGER.log(Level.FINE, "Changelog browser for " + url + ": "
+                   + browser.getClass().getSimpleName() + " at " + browser.getRepoUrl());
 
         scm.setBrowser(browser);
 
@@ -262,6 +277,28 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
      */
     public Boolean getChangelog() {
         return this.changelog;
+    }
+
+    /**
+     * Sets the base URL of the repository browser used for the changelog links.
+     *
+     * @param browserUrl The browser base URL, without the trailing {@code +/<sha>} part.
+     */
+    @DataBoundSetter
+    public void setBrowserUrl(String browserUrl) {
+        this.browserUrl = browserUrl;
+    }
+
+    /**
+     * Gets the configured base URL of the repository browser.
+     *
+     * @return The configured URL, or {@code null} when it has to be guessed from the remote URL.
+     */
+    public String getBrowserUrl() {
+        if (browserUrl == null || browserUrl.trim().isEmpty()) {
+            return null;
+        }
+        return browserUrl.trim();
     }
 
     /**
