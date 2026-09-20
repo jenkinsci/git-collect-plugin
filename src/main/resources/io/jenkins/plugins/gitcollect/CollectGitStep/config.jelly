@@ -9,6 +9,9 @@
     <f:entry title="Git remote name" default="origin" field="remote" description="Optional remote name, if is not defined we consider it as origin">
         <f:textbox />
     </f:entry>
+    <f:entry title="Browser URL" field="browserUrl" description="Optional base URL for the changelog links, e.g. https://gerrithub.io/c/amarula/checks-jenkins. Leave empty to guess it from the remote.">
+        <f:textbox />
+    </f:entry>
     <f:entry field="changelog">
         <f:checkbox title="Include in changelog?" default="true"/>
     </f:entry>
