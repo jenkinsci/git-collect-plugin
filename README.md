@@ -69,6 +69,11 @@ stage reaches the same checkout first: a later `collectGit` reads the same histo
 nothing, so that it is not listed twice in the build. Two collects of one repository at two different
 revisions are both recorded. The step says so in the build log when it skips.
 
+A collection that brought no new commit - `markedCommit` resolving to the revision that is checked
+out - is registered like any other: the changelog is empty and the build shows no changes, but the
+checkout is recorded, and the repository is listed in the build as it is for a checkout that brought
+commits.
+
 #### Changelog links and the repository browser
 
 With `changelog: true`, every commit of the changelog links to its page on the web frontend of the
