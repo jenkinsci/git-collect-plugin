@@ -64,6 +64,11 @@ pipeline {
 }
 ```
 
+The same revision of a repository is collected into the build once, whichever branch of a `parallel`
+stage reaches the same checkout first: a later `collectGit` reads the same history and registers
+nothing, so that it is not listed twice in the build. Two collects of one repository at two different
+revisions are both recorded. The step says so in the build log when it skips.
+
 #### Changelog links and the repository browser
 
 With `changelog: true`, every commit of the changelog links to its page on the web frontend of the

@@ -11,6 +11,18 @@ public class MultiScmEnvAction implements EnvironmentContributingAction {
         this.info = info;
     }
 
+    /**
+     * Gets the repository data this action contributes to the build environment.
+     *
+     * <p>It also says which repository the build collected, since one action is added for each
+     * collection: see {@link CollectGitStep#alreadyCollected(Run, LocalGitInfo)}.
+     *
+     * @return the data collected from the repository.
+     */
+    public LocalGitInfo getInfo() {
+        return info;
+    }
+
     @Override
     public void buildEnvironment(Run<?, ?> run, EnvVars env) {
         env.put("GIT_COMMIT", info.getShaRevision());

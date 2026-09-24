@@ -173,6 +173,86 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
     }
 
     /**
+     * Collects the repository into the build, unless the build already has the history of that
+     * revision of it.
+     *
+     * <p>The build is what makes the check and the record one step: the branches of a parallel
+     * pipeline run in the same JVM and share the same {@link Run} instance, so holding its monitor
+     * keeps two of them from both finding the build without the history and both registering it,
+     * which would list it twice.
+     *
+     * <p>The record is the {@link MultiScmEnvAction} the data is contributed to the build with, and
+     * it is added before the SCM listeners are notified on purpose: the git-forensics
+     * GitCheckoutListener resolves the repository HEAD from the GIT_COMMIT this action contributes
+     * (falling back to "HEAD"), so without it, it would pick up a stale GIT_COMMIT left over from an
+     * earlier checkout (e.g. a shared library) that does not exist in this repository.
+     *
+     * @param run  the current build.
+     * @param info the data collected from the repository.
+     * @return {@code true} when this call collected the repository, {@code false} when the build
+     *         already collected it.
+     */
+    static boolean markCollected(Run<?, ?> run, LocalGitInfo info) {
+        synchronized (run) {
+            if (alreadyCollected(run, info)) {
+                return false;
+            }
+            run.addAction(new MultiScmEnvAction(info));
+            return true;
+        }
+    }
+
+    /**
+     * Tells whether the build already collected the given history, whichever branch of a parallel
+     * pipeline asked for it and however many times.
+     *
+     * <p>A build collects the history of a revision of a repository once: the history of a build is a
+     * list, and the same history registered twice is listed twice, once for each collection.
+     *
+     * @param run  the current build.
+     * @param info the data collected from the repository.
+     * @return {@code true} when the build collected this history already.
+     */
+    static boolean alreadyCollected(Run<?, ?> run, LocalGitInfo info) {
+        for (MultiScmEnvAction collected : run.getActions(MultiScmEnvAction.class)) {
+            if (sameHistory(collected.getInfo(), info)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Tells whether two collections read the same history, that is the same revision of the same
+     * repository.
+     *
+     * <p>The URL is compared the way the Git SCM plugin compares them - the trailing slashes and the
+     * {@code .git} suffix are two spellings of the same repository - so that the checkouts of one
+     * repository are recognised as one repository however their remotes were configured. The revision
+     * is what the history of a collection ends at, and it is compared as well: the branches of a
+     * parallel pipeline build the same commit, while the two revisions a build collects on purpose
+     * are two histories that both belong to it.
+     *
+     * @param first  the data collected from a repository.
+     * @param second the data collected from a repository.
+     * @return {@code true} when both name the same revision of the same repository.
+     */
+    static boolean sameHistory(LocalGitInfo first, LocalGitInfo second) {
+        String firstUrl = normalizeUrl(first.getRemoteUrl());
+        String secondUrl = normalizeUrl(second.getRemoteUrl());
+        // A repository without a remote to name it is not the same as any other one.
+        return !firstUrl.isEmpty() && firstUrl.equals(secondUrl)
+               && first.getShaRevision().equals(second.getShaRevision());
+    }
+
+    private static String normalizeUrl(String url) {
+        String normalized = url == null ? "" : url.trim().replaceAll("/+$", "");
+        return normalized.endsWith(".git")
+               ? normalized.substring(0, normalized.length() - 4)
+               : normalized;
+    }
+
+    /**
      * Generates a standard Jenkins XML changelog file.
      *
      * <p>Calculates the difference between the {@code builtRevision} and the {@code markedRevision}
@@ -439,11 +519,15 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
 
         LOGGER.log(Level.FINE, "url: " + info.getRemoteUrl() + " branch: " + info.getBranch());
 
-        // Register the collected revision as GIT_COMMIT before notifying the SCM listeners. The
-        // git-forensics GitCheckoutListener resolves the repository HEAD from GIT_COMMIT (falling
-        // back to "HEAD"), so without this it would pick up a stale GIT_COMMIT left over from an
-        // earlier checkout (e.g. a shared library) that does not exist in this repository.
-        run.addAction(new MultiScmEnvAction(info));
+        // The branches of a parallel pipeline reach the same checkout together, and each of them
+        // would read the same history out of it: only the first one registers it, the others find it
+        // already collected into the build and leave it alone.
+        if (!markCollected(run, info)) {
+            listener.getLogger().println("[GitCollect] " + info.getShaRevision() + " of "
+                                         + info.getRemoteUrl()
+                                         + " is already collected into this build, skipping.");
+            return;
+        }
 
         Result result = run.getResult();
         if (result == null) {
