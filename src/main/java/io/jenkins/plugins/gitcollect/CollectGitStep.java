@@ -256,7 +256,9 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
      * Generates a standard Jenkins XML changelog file.
      *
      * <p>Calculates the difference between the {@code builtRevision} and the {@code markedRevision}
-     * found in the {@link LocalGitInfo} and writes it to a temporary file.
+     * found in the {@link LocalGitInfo} and writes it to a temporary file. The two are the same when
+     * the collection brought no new commit, and the file is empty then, which is what the SCM
+     * listeners are notified with all the same.
      *
      * @param run  The current build run.
      * @param git  The git client initialized for the target directory.
@@ -536,8 +538,11 @@ public class CollectGitStep extends Builder implements SimpleBuildStep {
 
         GitSCM scm = null;
 
-        if (changelog && !info.getMarkedRevision().getSha1String().equals(
-            info.getBuiltRevision().getSha1String())) {
+        // The SCM is built even when the collection brought no new commit, and the SCM listeners are
+        // notified all the same: what the changelog holds then is nothing, but it is the notification
+        // that records the checkout in the listeners that watch for it (git-forensics), and the SCM
+        // is what the BuildData of this build is carried over from the previous one with.
+        if (changelog) {
             String path = writeChangelog(run, git, info);
             if (path != null && !path.isEmpty() && run instanceof WorkflowRun) {
                 try {
